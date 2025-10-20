@@ -11,6 +11,8 @@ const ai = new GoogleGenAI({
 
 });
 
+// Puto vercel de mierda.
+
 async function generateDilemmas(): Promise<string[]> {
 
     const prompt = `Genera diez dilemas morales o éticos en español. 

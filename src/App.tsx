@@ -4,9 +4,19 @@ import SplitText from './components/SplitText';
 
 import './App.css';
 
+import QUESTIONS from './assets/questions.json';
+
 
 type CurrentState = 'loading' | 'question' | 'percentage';
 type Answers = Record<string, { yes: number; no: number; }>;
+
+const getSavedAnswers = ():Answers | {} => {
+  try {
+    return JSON.parse(localStorage.getItem('answers') || '{}');
+  } catch {
+    return {};
+  }
+};
 
 function App() {
   const [question, setQuestion] = useState('');
@@ -14,100 +24,70 @@ function App() {
 
   const percentageValuesRef = useRef<[number, number]>([NaN, NaN]);
 
-  const loadingDilemmas = useRef<Promise<any>>(undefined);
+  const answersRef = useRef<Answers>(getSavedAnswers());
 
-  const answersRef = useRef<Answers>(JSON.parse(localStorage.getItem('answers') as string) ?? {});
-
-  const dilemmasRef = useRef<string[]>([]);
   const questionIdRef = useRef(0);
   const questionCountRef = useRef(0);
 
-  async function loadDilemmas() {
-    const response = await fetch('/api/generate/');
-    const generatedDilemmas = await response.json() as string[];
-    dilemmasRef.current = [...dilemmasRef.current, ...generatedDilemmas];
-  }
+  const alreadyShownDilemmasRef = useRef<string[]>([]);
 
-  function checkDilemmas() {
-    if (dilemmasRef.current.length < 10) {
-      loadingDilemmas.current = new Promise<void>(async (resolve) => {
-        await loadDilemmas();
-        await loadDilemmas();
-        console.log("Dilemmas reloaded");
-        
-        resolve();
-      });
+  function getDilemma() {
+    let dilemma = undefined;
+
+    while (!dilemma || alreadyShownDilemmasRef.current.includes(dilemma)) {
+      dilemma = QUESTIONS[Math.floor(QUESTIONS.length * Math.random())];
     }
+
+    return dilemma;
   }
 
   function showNextDilemma() {
 
-    const dilemmas = dilemmasRef.current;
+    const dilemma = getDilemma();
 
-    checkDilemmas();
 
-    if (dilemmas.length > 0) {
-      questionIdRef.current++;
-      questionCountRef.current++;
-      setQuestion(dilemmas.shift() as string);
-      return;
-    }
+    questionIdRef.current++;
+    questionCountRef.current++;
 
-    setCurrentMode('loading');
-
-    loadingDilemmas.current?.then(() => {
-      showNextDilemma();
-    });
+    setQuestion(dilemma);
+    alreadyShownDilemmasRef.current.push(dilemma);
   }
 
   function optionClicked(option: 'yes' | 'no') {
-
-    if (questionCountRef.current >= 2) {
-      questionCountRef.current = 0;
-      const answeredQuestions = Object.keys(answersRef.current);
-      dilemmasRef.current.unshift(answeredQuestions[Math.floor(answeredQuestions.length - 1 * Math.random())]);
-      
-    }
     
     if (answersRef.current[question] == undefined) {
       answersRef.current[question] = {
         yes: 0,
         no: 0
       }
-    } else {
-      answersRef.current[question][option]++;
-      const { yes, no } = answersRef.current[question];
-
-      const total = yes + no;
-
-      const yesPercentage = yes / total * 100;
-      const noPercentage = no / total * 100;
-
-      percentageValuesRef.current = [yesPercentage, noPercentage];
-      setCurrentMode('percentage');
-      setTimeout(() => {
-        showNextDilemma();
-        setCurrentMode('question');
-      }, 3000);
-
-      return;
     }
 
-
     answersRef.current[question][option]++;
-    showNextDilemma();
+    const { yes, no } = answersRef.current[question];
+
+    const total = yes + no;
+
+    const yesPercentage = yes / total * 100;
+    const noPercentage = no / total * 100;
+
+    percentageValuesRef.current = [yesPercentage, noPercentage];
+
     localStorage.setItem('answers', JSON.stringify(answersRef.current));
+    setCurrentMode('percentage');
+
+    setTimeout(() => {
+      showNextDilemma();
+      setCurrentMode('question');
+    }, 3000);
+
+    if (alreadyShownDilemmasRef.current.length >= 20) {
+      alreadyShownDilemmasRef.current.shift();
+    }
   }
 
   useEffect(() => {
-    (async () => {
-
-      showNextDilemma();
-      await loadingDilemmas.current;
-      setCurrentMode('question');
-
-
-    })();
+    showNextDilemma();
+    setCurrentMode('question');
   }, []);
 
   return (
@@ -147,11 +127,14 @@ function App() {
             </div>
 
             <motion.div
-              key={`${index}#${questionIdRef.current}`}
+              
+              key={`bar-${index + questionIdRef.current}-${Math.random()}`}
+
               initial={{
                 opacity: 0,
-                height:0
+                height: 0
               }}
+
               animate={{
                 opacity: 1,
                 height: `${value}%`
@@ -160,6 +143,7 @@ function App() {
               transition={{
                 duration:1.5
               }}
+
               className='bg-black absolute bottom-0 left-0 w-full'>
               
               </motion.div>

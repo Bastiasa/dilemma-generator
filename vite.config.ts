@@ -6,4 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: "https://bastiasa.github.io/dilemma-generator/",
   plugins: [react(), tailwindcss()],
+  build: {
+    outDir: 'docs'
+  }
 })
